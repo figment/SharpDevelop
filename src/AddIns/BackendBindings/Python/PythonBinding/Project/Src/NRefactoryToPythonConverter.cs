@@ -56,6 +56,9 @@ namespace ICSharpCode.PythonBinding
 		// flag during yield statement to suppress child return statements
 		private bool suppressReturn = false;
 
+		// flag during case statement to suppress child break statements
+		private bool suppressBreak = false;
+
 		static readonly string Docstring = "\"\"\"";
 
 		public NRefactoryToPythonConverter(SupportedLanguage language)
@@ -441,7 +444,10 @@ namespace ICSharpCode.PythonBinding
 
 		public override object TrackedVisitBreakStatement(BreakStatement breakStatement, object data)
 		{
-			AppendIndentedLine("break");
+			if (suppressBreak)
+				AppendIndentedLine("pass #break"); // use pass as noop
+			else
+				AppendIndentedLine("break");
 			return null;
 		}
 
@@ -1497,6 +1503,8 @@ namespace ICSharpCode.PythonBinding
 
 		public override object TrackedVisitSwitchStatement(SwitchStatement switchStatement, object data)
 		{
+			var oldSuppressBreak = suppressBreak;
+			this.suppressBreak = true;
 			bool firstSection = true;
 			foreach (SwitchSection section in switchStatement.SwitchSections) {
 				// Create if/elif/else condition.
@@ -1509,6 +1517,8 @@ namespace ICSharpCode.PythonBinding
 
 				firstSection = false;
 			}
+
+			suppressBreak = oldSuppressBreak;
 			return null;
 		}
 
