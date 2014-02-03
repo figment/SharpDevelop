@@ -30,6 +30,7 @@ namespace ICSharpCode.PythonBinding
 		// references to fields or parameters.
 		List<ParameterDeclarationExpression> methodParameters = new List<ParameterDeclarationExpression>();
 		MethodDeclaration currentMethod;
+		bool methodHasOutputParameters = false;
 
 		// Holds the names of any parameters defined for this class.
 		List<string> propertyNames = new List<string>();
@@ -1234,6 +1235,10 @@ namespace ICSharpCode.PythonBinding
 		{
 			// Add method name.
 			currentMethod = methodDeclaration;
+
+			var oldMethodHasOutputParameters = methodHasOutputParameters;
+			methodHasOutputParameters = false;
+
 			string methodName = methodDeclaration.Name;
 			AppendIndented("def " + methodName);
 
@@ -1263,6 +1268,7 @@ namespace ICSharpCode.PythonBinding
 			}
 
 			methodParameters = oldMethodParameters;
+			methodHasOutputParameters = oldMethodHasOutputParameters;
 			currentMethod = null;
 
 			return null;
@@ -1474,7 +1480,25 @@ namespace ICSharpCode.PythonBinding
 				returnStatement.Expression.AcceptVisitor(this, data);
 			} else {
 				AppendIndented("return ");
+
+				// python returns out and ref generally as a return tuple
+				if (methodHasOutputParameters)
+					Append("(");
+
 				returnStatement.Expression.AcceptVisitor(this, data);
+
+				if (methodHasOutputParameters) {
+					if (currentMethod != null) {
+						foreach (var param in currentMethod.Parameters) {
+							if (param.ParamModifier == ParameterModifiers.Out
+								|| param.ParamModifier == ParameterModifiers.Ref) {
+								Append(", ");
+								Append(param.ParameterName);
+							}
+						}
+					}
+					Append(")");
+				}
 				AppendLine();
 			}
 			return null;
@@ -1753,7 +1777,7 @@ namespace ICSharpCode.PythonBinding
 
 			if (!skipInitializer)
 				usingStatement.ResourceAcquisition.AcceptVisitor(this, data);
-			
+
 			AppendIndentedLine("try:");
 			IncreaseIndent();
 			if (IsEmptyStatement(usingStatement.EmbeddedStatement))
@@ -2558,10 +2582,19 @@ namespace ICSharpCode.PythonBinding
 					Append("self, ");
 				}
 				for (int i = 0; i < parameters.Count; ++i) {
+					var param = parameters[i];
+					if (param.ParamModifier == ParameterModifiers.Out
+						|| param.ParamModifier == ParameterModifiers.Ref) {
+						// track both ref and output for return statement
+						methodHasOutputParameters = true;
+						// drop output parameters from declarations
+						if (param.ParamModifier == ParameterModifiers.Out)
+							continue;
+					}
 					if (i > 0) {
 						Append(", ");
 					}
-					Append(parameters[i].ParameterName);
+					Append(param.ParameterName);
 				}
 			} else {
 				if (!IsStatic(method)) {
