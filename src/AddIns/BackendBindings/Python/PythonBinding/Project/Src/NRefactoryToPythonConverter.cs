@@ -2891,6 +2891,7 @@ namespace ICSharpCode.PythonBinding
 			foreach (var expression in list) {
 				AppendIndented(String.Empty);
 				expression.AcceptVisitor(this, null);
+				AppendLine();
 			}
 			accumulatePostfixStatements = oldAccumulatePostfixStatements;
 		}
